@@ -2,6 +2,10 @@
 
 `respi` is an independent copy of the working Waveshare LVGL + touch + Wi-Fi web demo. It adds multicast DNS (mDNS), so the device can be reached by name instead of a DHCP address.
 
+## Related project
+
+This is a related ESP32 hardware project to the browser-based tide-clock project at [github.com/robch/tide-clock](https://github.com/robch/tide-clock). The related project is hosted at [tideclock.org](https://tideclock.org/); this repository focuses on the Waveshare ESP32-S3 device and its local display, touch, Wi-Fi, and mDNS demo.
+
 ## Device URL
 
 ```text
