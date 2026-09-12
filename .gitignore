@@ -1,0 +1,29 @@
+# PlatformIO build output and local package/cache data
+.pio/
+
+# PlatformIO / IDE metadata
+.vscode/
+.idea/
+*.code-workspace
+
+# Local firmware artifacts (rebuild with `pio run`)
+*.bin
+*.elf
+*.map
+*.hex
+*.uf2
+
+# Local credentials and device-specific configuration
+src/secrets.h
+src/*_secrets.h
+include/secrets.h
+include/*_secrets.h
+.env
+.env.*
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
