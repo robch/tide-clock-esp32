@@ -37,6 +37,19 @@ pio device monitor --port COM3 --baud 115200
 
 Close the monitor before uploading. The current machine uses COM3. On another machine, discover the port with `pio device list`, then replace `COM3` in the monitor command. The `upload_port` and `monitor_port` settings in `platformio.ini` are machine-specific; update them locally when the device uses a different port.
 
+## Windows graphical simulator
+
+A hardware-free SDL2 simulator renders an animated 466x466 tide-clock window. From Git Bash, run:
+
+```bash
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/run-gui-sim.ps1
+```
+
+The script discovers Visual Studio and the Windows SDK, downloads SDL2 2.32.10 into the ignored `.deps` directory, builds the simulator, and opens it. Click the window or press Space to toggle tide data; press Escape to close it. Use `-BuildOnly` to compile without opening the window, or `-SmokeTest` for an automated launch test.
+
+The current desktop display uses synthetic tide values and a native SDL2 renderer. It is useful for visual layout and interaction work, but it does not yet execute the firmware's LVGL rendering or fetch live NOAA data.
+
+
 ## Naming
 
 The hostname was chosen as `respi`, a short name inspired by the round ESP32 display and pi/3.14 wordplay. The mDNS URL is `http://respi.local/`.

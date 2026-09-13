@@ -1,5 +1,13 @@
 # PlatformIO build output and local package/cache data
 .pio/
+.deps/
+.sim-build/
+*.obj
+*.exe
+
+# Local AI assistant/session state
+.cycod/
+chat-history.jsonl
 
 # PlatformIO / IDE metadata
 .vscode/
