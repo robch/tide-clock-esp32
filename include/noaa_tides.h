@@ -8,6 +8,7 @@
 #include <time.h>
 #include "secrets.h"
 #include <noaa_parser.h>
+#include <noaa_request.h>
 #include <tide_series.h>
 
 // Match the website: retain every six-minute prediction from the 29 local
@@ -69,13 +70,21 @@ static bool fetchNoaaDatum(const char* datum) {
   const time_t now = time(nullptr);
   const String begin = noaaDate(now - 14 * 24 * 3600);
   const String end = noaaDate(now + 14 * 24 * 3600);
-  const String url = String("https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=predictions&application=tide-clock-esp32&begin_date=") + begin + "&end_date=" + end + "&datum=" + datum + "&station=9437954&time_zone=lst_ldt&units=english&interval=6&format=json";
+  NoaaRequest request;
+  request.datum = datum;
+  const std::string url =
+      buildNoaaPredictionsUrl(request, begin.c_str(), end.c_str());
+  if (url.empty()) {
+    noaaStatus = "NOAA: URL construction failed";
+    return false;
+  }
   Serial.printf("NOAA: datum=%s range=%s..%s\n", datum, begin.c_str(), end.c_str());
 
   WiFiClientSecure client;
   client.setInsecure();
   HTTPClient http;
-  if (!http.begin(client, url)) { noaaStatus = "NOAA: HTTP begin failed"; return false; }
+  const String arduinoUrl(url.c_str());
+  if (!http.begin(client, arduinoUrl)) { noaaStatus = "NOAA: HTTP begin failed"; return false; }
   http.setTimeout(30000);
   const int status = http.GET();
   if (status != HTTP_CODE_OK) {
