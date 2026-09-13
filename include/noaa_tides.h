@@ -7,8 +7,7 @@
 #include <math.h>
 #include <time.h>
 #include "secrets.h"
-
-struct TideSample { time_t when; float height; };
+#include <tide_series.h>
 
 // Match the website: retain every six-minute prediction from the 29 local
 // calendar days spanning today -14 days through today +14 days. The cache is
@@ -165,21 +164,9 @@ static void fetchNoaaPredictions() {
 }
 
 static float noaaHeightAt(time_t target) {
-  if (!noaaDataActive || tideSampleCount < 2) return NAN;
-  if (target < tideSamples[0].when || target > tideSamples[tideSampleCount - 1].when) return NAN;
-
-  // Binary search the complete, chronologically sorted cache.
-  size_t low = 1;
-  size_t high = tideSampleCount - 1;
-  while (low < high) {
-    const size_t mid = low + (high - low) / 2;
-    if (tideSamples[mid].when < target) low = mid + 1;
-    else high = mid;
-  }
-  const size_t i = low;
-  const float span = static_cast<float>(tideSamples[i].when - tideSamples[i - 1].when);
-  const float fraction = span > 0 ? static_cast<float>(target - tideSamples[i - 1].when) / span : 0.0f;
-  return tideSamples[i - 1].height + (tideSamples[i].height - tideSamples[i - 1].height) * fraction;
+  if (!noaaDataActive) return NAN;
+  const TideSeries series(tideSamples, tideSampleCount);
+  return series.heightAt(target);
 }
 
 static float hoursFromNow(time_t value, time_t now) {
