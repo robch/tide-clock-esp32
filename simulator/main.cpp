@@ -10,6 +10,7 @@
 
 #include "tide_geometry.h"
 #include "tide_rules.h"
+#include "noaa_windows.h"
 namespace {
 constexpr int W = 466, H = 466, CX = W / 2, CY = H / 2;
 constexpr float PI = 3.14159265358979323846f;
@@ -30,8 +31,8 @@ float tideHeight(float hours) {
                 + 0.55f * std::sin((hours + 1.0f) * TAU / 24.0f);
 }
 
-float heightRadius(float height) {
-    return ::heightRadius(height, -2.0f, 10.0f, CLOCK_RADIUS);
+float heightRadius(float height, float minimum, float maximum) {
+    return ::heightRadius(height, minimum, maximum, CLOCK_RADIUS);
 }
 
 void setColor(SDL_Renderer* r, Color c) { SDL_SetRenderDrawColor(r, c.r, c.g, c.b, c.a); }
@@ -102,39 +103,39 @@ void text(SDL_Renderer* r, int centerX, int top, const std::string& value, Color
     }
 }
 
-void render(SDL_Renderer* r, bool dataVisible, double elapsedSeconds) {
+void render(SDL_Renderer* r, bool dataVisible, const SimulatorTideData& data) {
     const Color background{8, 17, 32}, pale{220, 240, 248}, grid{38, 73, 99};
     const Color cyan{79, 214, 255}, fill{45, 170, 214, 90}, yellow{255, 209, 102};
     const Color red{255, 107, 107}, offline{210, 95, 95};
     setColor(r, background); SDL_RenderClear(r);
 
     circle(r, {CX, CY}, CLOCK_RADIUS, {127, 168, 189});
-    for (float feet = -2; feet <= 10; feet += 2) circle(r, {CX, CY}, heightRadius(feet), grid);
+    for (float feet = -2; feet <= 10; feet += 2) {
+        circle(r, {CX, CY}, heightRadius(feet, data.minimum, data.maximum), grid);
+    }
 
     if (dataVisible) {
-        const float nowHours = static_cast<float>(elapsedSeconds / 3600.0);
         const std::time_t now = std::time(nullptr);
-        std::vector<TideSample> samples(121);
-        for (size_t i = 0; i < samples.size(); ++i) {
-            samples[i] = {now + static_cast<std::time_t>(i * 6 * 60),
-                          tideHeight(nowHours + static_cast<float>(i) / 10.0f)};
-        }
-        const TideSeries tides(samples.data(), samples.size());
+        const TideSeries tides(data.samples.data(), data.samples.size());
         for (int i = 0; i < 120; ++i) {
-            const float h1 = i * 12.0f / 120.0f, h2 = (i + 1) * 12.0f / 120.0f;
-            const float a1 = h1 * TAU / 12.0f, a2 = h2 * TAU / 12.0f;
+            const std::time_t t1 = now + i * 6 * 60;
+            const std::time_t t2 = now + (i + 1) * 6 * 60;
+            const float a1 = timeAngle(t1), a2 = timeAngle(t2);
             Point outer1 = polar(a1, CLOCK_RADIUS), outer2 = polar(a2, CLOCK_RADIUS);
-            Point curve1 = polar(a1, heightRadius(samples[i].height));
-            Point curve2 = polar(a2, heightRadius(samples[i + 1].height));
+            const float height1 = tides.heightAt(t1), height2 = tides.heightAt(t2);
+            Point curve1 = polar(a1, heightRadius(height1, data.minimum, data.maximum));
+            Point curve2 = polar(a2, heightRadius(height2, data.minimum, data.maximum));
             quad(r, {outer1, outer2, curve2, curve1}, fill);
             line(r, curve1, curve2, cyan, 3);
         }
-        for (size_t i = 1; i + 1 < tides.count(); ++i) {
-            const bool high = isHighTide(samples[i - 1], samples[i], samples[i + 1]);
-            const bool low = isLowTide(samples[i - 1], samples[i], samples[i + 1]);
+        for (size_t i = 1; i + 1 < data.samples.size(); ++i) {
+            const auto& sample = data.samples[i];
+            if (sample.when < now || sample.when > now + 12 * 3600) continue;
+            const bool high = isHighTide(data.samples[i - 1], sample, data.samples[i + 1]);
+            const bool low = isLowTide(data.samples[i - 1], sample, data.samples[i + 1]);
             if (!high && !low) continue;
-            const float angle = (static_cast<float>(i) / 10.0f) * TAU / 12.0f;
-            filledCircle(r, polar(angle, heightRadius(samples[i].height)), 5, yellow);
+            const float angle = timeAngle(sample.when);
+            filledCircle(r, polar(angle, heightRadius(sample.height, data.minimum, data.maximum)), 5, yellow);
         }
     }
 
@@ -159,8 +160,9 @@ void render(SDL_Renderer* r, bool dataVisible, double elapsedSeconds) {
     line(r, polar(second, -CLOCK_RADIUS * .12f), polar(second, CLOCK_RADIUS * .85f), red, 2);
     filledCircle(r, {CX, CY}, 6, red);
 
-    if (!dataVisible) text(r, CX, CY - 8, "NO TIDE DATA", offline, 3);
-    text(r, CX, H - 24, dataVisible ? "NOAA LIVE" : "NOAA OFFLINE", dataVisible ? cyan : offline, 2);
+    if (!dataVisible || !data.live) text(r, CX, CY - 8, "NO TIDE DATA", offline, 3);
+    text(r, CX, H - 24, dataVisible && data.live ? "NOAA LIVE" : "NOAA OFFLINE",
+         dataVisible && data.live ? cyan : offline, 2);
     SDL_RenderPresent(r);
 }
 }
@@ -181,8 +183,12 @@ int main(int argc, char** argv) {
         if (window) SDL_DestroyWindow(window); SDL_Quit(); return 2;
     }
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SimulatorTideData tideData;
+    std::fprintf(stdout, "Fetching live NOAA data...\n");
+    fetchNoaaData(tideData);
+    std::fprintf(stdout, "%s (%zu samples)\n", tideData.status.c_str(), tideData.samples.size());
+
     bool running = true, dataVisible = true;
-    const Uint64 start = SDL_GetPerformanceCounter();
     int frames = 0;
     while (running) {
         SDL_Event event{};
@@ -190,8 +196,7 @@ int main(int argc, char** argv) {
             if (event.type == SDL_QUIT || (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) running = false;
             if (event.type == SDL_MOUSEBUTTONDOWN || (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_SPACE)) dataVisible = !dataVisible;
         }
-        const double elapsed = static_cast<double>(SDL_GetPerformanceCounter() - start) / SDL_GetPerformanceFrequency();
-        render(renderer, dataVisible, elapsed);
+        render(renderer, dataVisible, tideData);
         if (smoke && ++frames >= 10) running = false;
         SDL_Delay(10);
     }

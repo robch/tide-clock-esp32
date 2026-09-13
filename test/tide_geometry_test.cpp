@@ -1,6 +1,7 @@
 #include <cassert>
 #include <cmath>
 #include <iostream>
+#include <ctime>
 #include "tide_geometry.h"
 
 namespace {
@@ -28,11 +29,25 @@ void test_height_mapping_and_clamping() {
   assertNear(heightRadius(100.0f, -2.0f, 10.0f, 177.0f), 17.7f);
   assertNear(heightRadius(5.0f, 4.0f, 4.0f, 177.0f), 88.5f);
 }
+void test_time_angles_follow_local_clock() {
+  std::tm local{};
+  local.tm_year = 126;
+  local.tm_mon = 8;
+  local.tm_mday = 12;
+  local.tm_hour = 12;
+  local.tm_isdst = -1;
+  const std::time_t noon = std::mktime(&local);
+  const std::time_t three = noon + 3 * 3600;
+  const float quarterTurn = timeAngle(three) - timeAngle(noon);
+  assertNear(quarterTurn, 3.14159265358979323846f / 2.0f);
+}
+
 }
 
 int main() {
   test_cardinal_points();
   test_height_mapping_and_clamping();
+  test_time_angles_follow_local_clock();
   std::cout << "Tide geometry tests passed\n";
   return 0;
 }

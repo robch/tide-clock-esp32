@@ -85,13 +85,6 @@ float heightRadius(float height) {
   return ::heightRadius(height, minimum, maximum, CLOCK_RADIUS);
 }
 
-float timeAngle(time_t sampleTime) {
-  struct tm local{};
-  localtime_r(&sampleTime, &local);
-  const float hour12 = (local.tm_hour % 12) + local.tm_min / 60.0f + local.tm_sec / 3600.0f;
-  return hour12 * TAU / 12.0f;
-}
-
 void drawTextCentered(lv_point_t p, int width, const char* text, lv_color_t textColor) {
   lv_draw_label_dsc_t dsc;
   lv_draw_label_dsc_init(&dsc);
