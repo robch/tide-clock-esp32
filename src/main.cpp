@@ -9,6 +9,7 @@
 #include "secrets.h"
 #include "noaa_tides.h"
 #include <tide_geometry.h>
+#include <tide_rules.h>
 
 namespace {
 constexpr int W = 466;
@@ -193,12 +194,9 @@ void drawHighLowMarkers(time_t now, lv_color_t yellow, lv_color_t background) {
   for (size_t i = 1; i + 1 < tideSampleCount; ++i) {
     const TideSample& sample = tideSamples[i];
     if (sample.when < now || sample.when > end) continue;
-    const bool high = sample.height >= tideSamples[i - 1].height &&
-                      sample.height >= tideSamples[i + 1].height;
-    const bool low = sample.height <= tideSamples[i - 1].height &&
-                     sample.height <= tideSamples[i + 1].height;
-    if ((!high && !low) ||
-        (sample.height == tideSamples[i - 1].height && sample.height == tideSamples[i + 1].height)) continue;
+    const bool high = isHighTide(tideSamples[i - 1], sample, tideSamples[i + 1]);
+    const bool low = isLowTide(tideSamples[i - 1], sample, tideSamples[i + 1]);
+    if (!high && !low) continue;
 
     const float angle = timeAngle(sample.when);
     const float radius = heightRadius(sample.height);
@@ -233,8 +231,8 @@ void drawClockFace() {
 
   const time_t now = time(nullptr);
   if (noaaDataActive) {
-    const bool completeWindow = isfinite(noaaHeightAt(now - 6 * 3600)) &&
-                                isfinite(noaaHeightAt(now + 18 * 3600));
+    const TideSeries tides(tideSamples, tideSampleCount);
+    const bool completeWindow = hasCompleteWindow(tides, now, 6 * 3600, 18 * 3600);
     if (completeWindow) {
       drawMainTideRing(now, cyan, fillColor);
       drawHighLowMarkers(now, yellow, background);
