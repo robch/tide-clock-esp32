@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "tide_geometry.h"
+#include "tide_rules.h"
 namespace {
 constexpr int W = 466, H = 466, CX = W / 2, CY = H / 2;
 constexpr float PI = 3.14159265358979323846f;
@@ -112,19 +113,28 @@ void render(SDL_Renderer* r, bool dataVisible, double elapsedSeconds) {
 
     if (dataVisible) {
         const float nowHours = static_cast<float>(elapsedSeconds / 3600.0);
+        const std::time_t now = std::time(nullptr);
+        std::vector<TideSample> samples(121);
+        for (size_t i = 0; i < samples.size(); ++i) {
+            samples[i] = {now + static_cast<std::time_t>(i * 6 * 60),
+                          tideHeight(nowHours + static_cast<float>(i) / 10.0f)};
+        }
+        const TideSeries tides(samples.data(), samples.size());
         for (int i = 0; i < 120; ++i) {
-            float h1 = i * 12.0f / 120.0f, h2 = (i + 1) * 12.0f / 120.0f;
-            float a1 = h1 * TAU / 12.0f, a2 = h2 * TAU / 12.0f;
+            const float h1 = i * 12.0f / 120.0f, h2 = (i + 1) * 12.0f / 120.0f;
+            const float a1 = h1 * TAU / 12.0f, a2 = h2 * TAU / 12.0f;
             Point outer1 = polar(a1, CLOCK_RADIUS), outer2 = polar(a2, CLOCK_RADIUS);
-            Point curve1 = polar(a1, heightRadius(tideHeight(nowHours + h1)));
-            Point curve2 = polar(a2, heightRadius(tideHeight(nowHours + h2)));
+            Point curve1 = polar(a1, heightRadius(samples[i].height));
+            Point curve2 = polar(a2, heightRadius(samples[i + 1].height));
             quad(r, {outer1, outer2, curve2, curve1}, fill);
             line(r, curve1, curve2, cyan, 3);
         }
-        for (float h : {2.0f, 8.2f}) {
-            float a = h * TAU / 12.0f;
-            Point p = polar(a, heightRadius(tideHeight(nowHours + h)));
-            filledCircle(r, p, 5, yellow);
+        for (size_t i = 1; i + 1 < tides.count(); ++i) {
+            const bool high = isHighTide(samples[i - 1], samples[i], samples[i + 1]);
+            const bool low = isLowTide(samples[i - 1], samples[i], samples[i + 1]);
+            if (!high && !low) continue;
+            const float angle = (static_cast<float>(i) / 10.0f) * TAU / 12.0f;
+            filledCircle(r, polar(angle, heightRadius(samples[i].height)), 5, yellow);
         }
     }
 

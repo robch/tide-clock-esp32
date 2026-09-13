@@ -50,8 +50,10 @@ $env:LIB = @(
 
 $source = Join-Path $root 'simulator\main.cpp'
 $geometry = Join-Path $root 'lib\tide_core\tide_geometry.cpp'
+$series = Join-Path $root 'lib\tide_core\tide_series.cpp'
+$rules = Join-Path $root 'lib\tide_core\tide_rules.cpp'
 $exe = Join-Path $build 'tide-clock-sim.exe'
-& $cl /nologo /EHsc /std:c++17 /O2 "/I$(Join-Path $root 'lib\tide_core')" $source $geometry /link SDL2.lib shell32.lib "/out:$exe"
+& $cl /nologo /EHsc /std:c++17 /O2 "/I$(Join-Path $root 'lib\tide_core')" $source $geometry $series $rules /link SDL2.lib shell32.lib "/out:$exe"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Copy-Item (Join-Path $sdlRoot 'lib\x64\SDL2.dll') $build -Force
 Write-Host "Built $exe"
