@@ -7,6 +7,7 @@
 #include <math.h>
 #include <time.h>
 #include "secrets.h"
+#include <noaa_parser.h>
 #include <tide_series.h>
 
 // Match the website: retain every six-minute prediction from the 29 local
@@ -50,62 +51,17 @@ static bool parseNoaa(const String& body) {
     return false;
   }
 
-  size_t count = 0;
-  int cursor = 0;
-  float minHeight = INFINITY;
-  float maxHeight = -INFINITY;
-  time_t previous = 0;
-  bool overflow = false;
-
-  while (true) {
-    const int tKey = body.indexOf("\"t\":\"", cursor);
-    if (tKey < 0) break;
-    const int tStart = tKey + 5;
-    const int tEnd = body.indexOf('\"', tStart);
-    const int vKey = body.indexOf("\"v\":\"", tEnd);
-    if (tEnd < 0 || vKey < 0) break;
-    const int vStart = vKey + 5;
-    const int vEnd = body.indexOf('\"', vStart);
-    if (vEnd < 0) break;
-
-    int year, month, day, hour, minute;
-    const String timestamp = body.substring(tStart, tEnd);
-    const String valueText = body.substring(vStart, vEnd);
-    if (sscanf(timestamp.c_str(), "%d-%d-%d %d:%d", &year, &month, &day, &hour, &minute) == 5) {
-      struct tm local{};
-      local.tm_year = year - 1900;
-      local.tm_mon = month - 1;
-      local.tm_mday = day;
-      local.tm_hour = hour;
-      local.tm_min = minute;
-      local.tm_isdst = -1;
-      const time_t when = mktime(&local);
-      const float height = valueText.toFloat();
-      if (when > 0 && isfinite(height) && (count == 0 || when > previous)) {
-        if (count >= MAX_TIDE_SAMPLES) {
-          overflow = true;
-          break;
-        }
-        tideSamples[count++] = {when, height};
-        previous = when;
-        minHeight = min(minHeight, height);
-        maxHeight = max(maxHeight, height);
-      }
-    }
-    cursor = vEnd + 1;
-  }
-
-  if (overflow) {
+  const NoaaParseResult result = parseNoaaPredictions(
+      body.c_str(), body.length(), tideSamples, MAX_TIDE_SAMPLES);
+  if (result.overflow) {
     noaaStatus = String("NOAA: response exceeds cache capacity ") + MAX_TIDE_SAMPLES;
     return false;
   }
-  if (count < 3 || !isfinite(minHeight) || !isfinite(maxHeight) || maxHeight <= minHeight) {
-    return false;
-  }
+  if (!result.success) return false;
 
-  tideSampleCount = count;
-  noaaHeightMin = floorf(minHeight / 2.0f) * 2.0f;
-  noaaHeightMax = ceilf(maxHeight / 2.0f) * 2.0f;
+  tideSampleCount = result.count;
+  noaaHeightMin = result.minimum;
+  noaaHeightMax = result.maximum;
   return true;
 }
 
