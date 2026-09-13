@@ -8,6 +8,7 @@
 #include "FT3168.h"
 #include "secrets.h"
 #include "noaa_tides.h"
+#include <tide_geometry.h>
 
 namespace {
 constexpr int W = 466;
@@ -32,8 +33,9 @@ lv_color_t blend(lv_color_t foreground, lv_color_t background, float amount) {
 }
 
 lv_point_t polar(float angle, float radius) {
-  return {static_cast<lv_coord_t>(lroundf(CX + sinf(angle) * radius)),
-          static_cast<lv_coord_t>(lroundf(CY - cosf(angle) * radius))};
+  const ClockPoint point = ::polar(angle, radius, CX, CY);
+  return {static_cast<lv_coord_t>(lroundf(point.x)),
+          static_cast<lv_coord_t>(lroundf(point.y))};
 }
 
 void line(lv_point_t a, lv_point_t b, lv_color_t c, uint8_t width = 1) {
@@ -78,10 +80,8 @@ void filledQuad(const lv_point_t (&points)[4], lv_color_t c, lv_opa_t opacity) {
 float heightRadius(float height) {
   const float minimum = noaaDataActive ? noaaHeightMin : DEFAULT_MIN_HEIGHT;
   const float maximum = noaaDataActive ? noaaHeightMax : DEFAULT_MAX_HEIGHT;
-  if (maximum <= minimum) return CLOCK_RADIUS * 0.5f;
-  const float normalized = constrain((height - minimum) / (maximum - minimum), 0.0f, 1.0f);
   // Exact website mapping: low=90% of R, high=10% of R.
-  return CLOCK_RADIUS * (0.90f - normalized * 0.80f);
+  return ::heightRadius(height, minimum, maximum, CLOCK_RADIUS);
 }
 
 float timeAngle(time_t sampleTime) {

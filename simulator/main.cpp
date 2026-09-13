@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "tide_geometry.h"
 namespace {
 constexpr int W = 466, H = 466, CX = W / 2, CY = H / 2;
 constexpr float PI = 3.14159265358979323846f;
@@ -18,7 +19,8 @@ struct Point { float x, y; };
 struct Color { Uint8 r, g, b, a = 255; };
 
 Point polar(float angle, float radius) {
-    return {CX + std::sin(angle) * radius, CY - std::cos(angle) * radius};
+    const ClockPoint point = ::polar(angle, radius, CX, CY);
+    return {point.x, point.y};
 }
 
 float tideHeight(float hours) {
@@ -28,8 +30,7 @@ float tideHeight(float hours) {
 }
 
 float heightRadius(float height) {
-    const float normalized = std::clamp((height + 2.0f) / 12.0f, 0.0f, 1.0f);
-    return CLOCK_RADIUS * (0.90f - normalized * 0.80f);
+    return ::heightRadius(height, -2.0f, 10.0f, CLOCK_RADIUS);
 }
 
 void setColor(SDL_Renderer* r, Color c) { SDL_SetRenderDrawColor(r, c.r, c.g, c.b, c.a); }
